@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8" />
+      <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <title>Document</title>
+      <style>
+         * {
+            margin: 0;
+            padding: 0;
+         }
+         button {
+            cursor: pointer;
+            box-sizing: border-box;
+            outline: 0px;
+            border: 0px;
+            margin: 0px;
+            user-select: none;
+            font-family: Roboto, Helvetica, Arial, sans-serif;
+            font-weight: 500;
+            letter-spacing: 0.02857em;
+            padding: 2px 6px;
+            border-radius: 2px;
+            transition: background-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,
+               box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,
+               border-color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms,
+               color 250ms cubic-bezier(0.4, 0, 0.2, 1) 0ms;
+            color: #000;
+            background-color: #e0e0e0;
+            opacity: 0.9;
+         }
+         button:hover {
+            opacity: 1;
+            box-shadow: rgba(0, 0, 0, 0.2) 0px 2px 3px -1px,
+               rgba(0, 0, 0, 0.14) 0px 3x 3px 0px,
+               rgba(0, 0, 0, 0.12) 0px 1px 3px 0px;
+         }
+         .danger {
+            color: #fff;
+            background-color: #ef5350;
+         }
+         .primary {
+            color: #fff;
+            background-color: #29b6f6;
+         }
+
+         body {
+            padding: 8px;
+         }
+         #result {
+            overflow: auto;
+            max-height: 460px;
+         }
+         #result div {
+            padding: 4px;
+            border-radius: 2px;
+            cursor: pointer;
+            margin-bottom: 16px;
+         }
+         #result div:hover {
+            background-color: rgb(217, 241, 255);
+         }
+
+         .success-bubble {
+            position: fixed;
+            background-color: #a7a7a7;
+            color: #fbfbfb;
+            padding: 4px 8px;
+            font-size: 12px;
+            border-radius: 2px;
+            display: none;
+         }
+         #article_show {
+            display: none;
+            border: 1px solid;
+            overflow: auto;
+            font-family: system-ui;
+            margin-bottom: 4px;
+         }
+         .content {
+            height: 500px;
+            width: 100%;
+            padding: 4px 2px;
+            margin-top: 10px;
+         }
+      </style>
+   </head>
+   <body>
+      <div style="display: flex">
+         <div id="successBubble" class="success-bubble">复制成功</div>
+         <div style="width: 180px; margin-right: 16px">
+            <h3>成语列表</h3>
+            <button id="clearKeyword" class="danger">清空成语</button>
+            <button id="export">导出成语</button>
+            <textarea
+               id="keyword"
+               cols="16"
+               style="
+                  height: 500px;
+                  padding: 4px 2px;
+                  margin-top: 10px;
+                  width: 100%;
+               "
+            ></textarea>
+         </div>
+         <div style="flex: 1; margin-right: 16px">
+            <h3>文章内容</h3>
+            <button id="clearArticle" class="danger">清空文章</button>
+            <textarea class="content" id="article"></textarea>
+            <div id="article_show" class="content"></div>
+         </div>
+         <div style="width: 400px">
+            <h3>检索区域</h3>
+            <div style="display: inline-block">
+               <input
+                  type="radio"
+                  id="juhao"
+                  name="way"
+                  value="juhao"
+                  checked
+               />
+               <label for="juhao">句号</label>
+
+               <input type="radio" id="douhao" name="way" value="douhao" />
+               <label for="douhao">逗号</label>
+            </div>
+            <button id="generator" class="primary">获取句子</button>
+            <button id="copyAll">复制全部</button>
+
+            <div style="border: 1px solid #eee; padding: 4px; margin-top: 16px">
+               <div id="result" style="padding: 4px"></div>
+               <span id="result_num" style="color: #676767;"></span>
+            </div>
+         </div>
+      </div>
+      <button id="save" style="background-color: #00c853; color: #fff">
+         保存记录
+      </button>
+
+      <script>
+         var successBubble = document.getElementById('successBubble');
+
+         function showSuccessBubble(x, y) {
+            successBubble.style.left = x + 'px';
+            successBubble.style.top = y - 20 + 'px';
+            successBubble.style.display = 'block';
+         }
+
+         function hideSuccessBubble() {
+            successBubble.style.display = 'none';
+         }
+
+         function findAllIndices(str, targetChars) {
+            const indicesMap = {};
+
+            for (let i = 0; i < targetChars.length - 3; i++) {
+               const targetChar = `${targetChars[i]}${targetChars[i + 1]}${
+                  targetChars[i + 2]
+               }${targetChars[i + 3]}`;
+               for (let j = 0; j < str.length; j++) {
+                  if (str[j] === targetChar) {
+                     indicesMap[targetChar] = [];
+                     indicesMap[targetChar].push(i);
+                  }
+               }
+            }
+
+            return indicesMap;
+         }
+
+         function findSurroundingDots(text, targetIndex, dot) {
+            let startIndex = targetIndex;
+            let endIndex = targetIndex;
+            // 向前搜索句号
+            while (startIndex >= 0) {
+               if (text[startIndex] === '。' || text[startIndex] === dot) {
+                  break;
+               }
+               startIndex--;
+            }
+
+            // 向后搜索句号
+            while (endIndex < text.length) {
+               if (text[endIndex] === '。' || text[endIndex] === dot) {
+                  break;
+               }
+               endIndex++;
+            }
+
+            return [startIndex, endIndex];
+         }
+
+         function init() {
+            const keyword = localStorage.getItem('keyword');
+            const article = localStorage.getItem('article');
+            const keywordEl = document.getElementById('keyword');
+            const articleEl = document.getElementById('article');
+            keywordEl.value = keyword;
+            articleEl.value = article;
+         }
+
+         function copy(value, event) {
+            if (navigator.clipboard) {
+               navigator.clipboard.writeText(value).then(() => {
+                  if (event) {
+                     showSuccessBubble(event.clientX, event.clientY);
+                     // 设置定时器，在一定时间后隐藏提示框
+                     setTimeout(function () {
+                        hideSuccessBubble();
+                     }, 2000); // 2000毫秒（2秒）后隐藏
+                  }
+               });
+            }
+         }
+         init();
+         const save = document.getElementById('save');
+         save.addEventListener('click', () => {
+            const keywordEl = document.getElementById('keyword');
+            const articleEl = document.getElementById('article');
+            localStorage.setItem('keyword', keywordEl.value);
+            localStorage.setItem('article', articleEl.value);
+         });
+
+         const exportEl = document.getElementById('export');
+         exportEl.addEventListener('click', () => {
+            const content = document.getElementById('keyword').value;
+            var formattedContent = content.replace(/\r?\n/g, '\r\n');
+            const element = document.createElement('a');
+            const blob = new Blob([formattedContent], { type: 'plain/text' });
+            const fileUrl = URL.createObjectURL(blob);
+            element.setAttribute('href', fileUrl);
+            element.setAttribute('download', 'log.txt');
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+         });
+
+         const clearKeyword = document.getElementById('clearKeyword');
+         clearKeyword.addEventListener('click', () => {
+            document.getElementById('keyword').value = '';
+            localStorage.setItem('keyword', '');
+         });
+         const clearArticle = document.getElementById('clearArticle');
+         clearArticle.addEventListener('click', () => {
+            document.getElementById('article').value = '';
+            document.getElementById('result').innerHTML = '';
+            document.getElementById('result_num').innerHTML = '';
+            localStorage.setItem('article', '');
+
+            // 切换面板
+            document.getElementById('article_show').style.display = 'none';
+            document.getElementById('article').style.display = 'block';
+         });
+
+         const btn = document.getElementById('generator');
+         btn.addEventListener('click', () => {
+            const keywordEl = document.getElementById('keyword');
+            const articleEl = document.getElementById('article');
+            const articleShowEl = document.getElementById('article_show');
+
+            const douhaoEl = document.getElementById('douhao');
+            const resultEl = document.getElementById('result');
+
+            const lines = keywordEl.value.split('\n');
+
+            let raw_article = articleEl.value;
+            const article = raw_article.replace(/\n/g, '');
+
+            const sentences = [];
+
+            if (lines.length === 0) return;
+            if (article.length === 0) return;
+
+            const allResults = findAllIndices(lines, article);
+            if (allResults.length === 0) return;
+            const resultArray = Object.entries(allResults);
+
+            const dot = douhaoEl.checked ? '，' : '。';
+            for (let i = 0; i < resultArray.length; i++) {
+               const keyword = resultArray[i][0];
+               const idxs = resultArray[i][1];
+               for (let j = 0; j < idxs.length; j++) {
+                  const [start, end] = findSurroundingDots(
+                     article,
+                     idxs[j],
+                     dot
+                  );
+                  const sentence = article.slice(start + 1, end); // 剪切后的句子
+
+                  // 给原文添加标注
+                  const after_underline = `<span style="text-decoration: underline;">${sentence}</span>`;
+
+                  const after_highlight = after_underline.replace(
+                     keyword,
+                     `<span style="background:yellow">${keyword}</span>`
+                  );
+                  raw_article = raw_article.replace(sentence, after_highlight);
+
+                  // 给搜索结果条目添加样式
+                  const htmlWithStyle =
+                     `<div class="child">${sentence}</div>`.replace(
+                        keyword,
+                        `<span style="background:yellow">${keyword}</span>`
+                     );
+                  sentences.push(htmlWithStyle);
+               }
+            }
+
+            raw_article = raw_article.replace(/\n/g, '<br>');
+
+            // // 将编辑框切换成展示框
+            articleEl.style.display = 'none';
+            articleShowEl.style.display = 'block';
+            articleShowEl.innerHTML = raw_article;
+
+            const stats=resultArray.map(item=>`${item[0]}(${item[1].length})`).join('、')
+            document.getElementById(
+               'result_num'
+            ).innerHTML = `<span style="color:blue">共${sentences.length}条结果</span>。<div>${stats}</div>`;
+            console.log(resultArray)
+
+            resultEl.innerHTML = sentences.join('');
+
+            resultEl.addEventListener('click', function (event) {
+               // 检查点击的是子元素
+               if (event.target.classList.contains('child')) {
+                  const value =
+                     event.target.innerText || event.target.textContent;
+                  copy(value, event);
+               }
+            });
+         });
+
+         const copyAllEl = document.getElementById('copyAll');
+         copyAllEl.addEventListener('click', () => {
+            const resultEl = document.getElementById('result');
+            copy(resultEl.innerText);
+         });
+      </script>
+   </body>
+</html>
